@@ -5,6 +5,8 @@ const path = require("path");
 const https = require("https");
 const fs = require("fs");
 const xlsx = require("xlsx");
+const needle = require("needle");
+const cheerio = require("cheerio");
 
 const text = require("./const");
 
@@ -25,61 +27,52 @@ bot.help((ctx) => ctx.reply(text.commands));
 
 bot.command("lessons", async (ctx) => {
   try {
-    await ctx.replyWithHTML(
-      "<b>Lessons</b>",
-      Markup.inlineKeyboard([[Markup.button.callback("IT faculty", "it_all")]])
-    );
-  } catch (error) {
-    console.error(error);
-  }
-});
-
-bot.action("it_all", async (ctx) => {
-  try {
-    await ctx.answerCbQuery();
-    await ctx.replyWithHTML(
-      "Select your year: ",
+    await ctx.replyWithHTML( 
+      "<b>Lessons (Your faculty)</b>",
       Markup.inlineKeyboard([
-        [
-          Markup.button.callback("IT-1 year", "it_1"),
-          Markup.button.callback("IT-2 year", "it_2"),
-          Markup.button.callback("IT-3 year", "it_3"),
-        ],
+        [Markup.button.callback("IT Faculty", "it")],
+        [Markup.button.callback("Management", "management"),Markup.button.callback("Tourism", "tourism")],
+        [Markup.button.callback("Finance", "finance"), Markup.button.callback("Logistic", "logistic")]
       ])
+      
+ 
     );
+    console.log("lessons");
   } catch (error) {
     console.error(error);
   }
 });
 
-bot.action("it_3", async (ctx) => {
-  try {
-    await ctx.answerCbQuery();
-    ctx.reply('Please Write a day in format "day/month/year>"');
-    botOn("it_3");
-  } catch (error) {
-    console.error(error);
-  }
-});
+botActionAllYears("IT", "it");
 
-bot.action("it_2", async (ctx) => {
-  try {
-    await ctx.answerCbQuery();
-    ctx.reply('Please Write a day in format "day/month/year>"');
-    botOn("it_2");
-  } catch (error) {
-    console.error(error);
-  }
-});
-bot.action("it_1", async (ctx) => {
-  try {
-    await ctx.answerCbQuery();
-    ctx.reply('Please Write a day in format "day/month/year>"');
-    botOn("it_1");
-  } catch (error) {
-    console.error(error);
-  }
-});
+botActionAllYears("Mgmt", "management");
+
+botActionAllYears("Tourism", "tourism");
+
+botActionAllYears("Finance", "finance");
+
+botActionAllYears("Logistic", "logistic");
+ 
+ 
+botAction("it_1"); 
+botAction("it_2"); 
+botAction("it_3"); 
+
+botAction("management_1"); 
+botAction("management_2"); 
+botAction("management_3"); 
+
+botAction("tourism_1"); 
+botAction("tourism_2"); 
+botAction("tourism_3"); 
+
+botAction("finance_1"); 
+botAction("finance_2"); 
+botAction("finance_3"); 
+
+botAction("logistic_1"); 
+botAction("logistic_2"); 
+botAction("logistic_3"); 
 
 bot.launch();
 
@@ -87,40 +80,108 @@ bot.launch();
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
 
+// ==============================================
+
+function botAction(value){
+  bot.action(value, async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      ctx.reply('Please Write a day in format "day/month/year>"');
+      botOn(value);
+    } catch (error) {
+      console.error(error);
+    }
+  });
+}
+
+
+function botActionAllYears(nameForUsers , value){
+  bot.action(value, async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      await ctx.replyWithHTML(
+        "Select your year: ",
+        Markup.inlineKeyboard([
+          [
+            Markup.button.callback(`${nameForUsers}-1 year`, `${value}_1`),
+            Markup.button.callback(`${nameForUsers}-2 year`, `${value}_2`),
+            Markup.button.callback(`${nameForUsers}-3 year`, `${value}_3`),
+          ],
+        ])
+      );
+      console.log("years");
+    } catch (error) {
+      console.error(error);
+    }
+  });
+}
+
+
+{
+const objOfUrlsForDownload = {};
+let GlobalValue;
 function botOn(value) {
-  let url;
-  if (value == "it_3") {
-    url =
-      "https://handlowa.eu/assets/dokumenty/studia/harmonogramy-zajec/AKTUALIZACJE/05-01/INF/4.01-Informatyka-studia-pierwszego-stopnia-stacjonarne-semestr-5.xlsx";
-  } else if (value == "it_2") {
-    url =
-      "https://handlowa.eu/assets/dokumenty/studia/harmonogramy-zajec/AKTUALIZACJE/21-01/21.01-Informatyka-studia-pierwszego-stopnia-stacjonarne-semestr-3.xlsx";
-  } else if (value == "it_1") {
-    url =
-      "https://handlowa.eu/assets/dokumenty/studia/harmonogramy-zajec/AKTUALIZACJE/05-01/INF/4.01-Informatyka-studia-pierwszego-stopnia-stacjonarne-semestr-1.xlsx";
-  }
+  console.log("value " + value);
+  GlobalValue = value;
+  get(GlobalValue)
+    .then((data) => {
+      const $ = cheerio.load(data);
+      let res = $(".red-table-header a");
+      console.log(value + " egrer");
+      objOfUrlsForDownload["1"] = res["0"]["attribs"]["href"];
+      objOfUrlsForDownload["2"] = res["1"]["attribs"]["href"];
+      objOfUrlsForDownload["3"] = res["2"]["attribs"]["href"];
+    })
+    .then(() => {
+      console.log(objOfUrlsForDownload);
 
-  new Promise((resolve, reject) => {
-    resolve(downloadFile(url, value + ".xlsx"));
-  }).then(() => {
-    bot.on("text", (ctx) => {
-      try {
-        let result;
-        const usersDate = ctx.message.text;
-        console.log("before path");
-
-        const pathToFile = path.join(__dirname, `${value}.xlsx`);
-        console.log("after path");
-        console.log(path.join(__dirname, `${value}.xlsx`));
-
-        result = test(pathToFile, checkAndFormatDate(usersDate));
-
-        ctx.reply(result);
-      } catch (e) {
-        console.log(e);
-        ctx.reply("Sorry , incorrect date /help");
+      let url;
+      if (value.split("_")[1] == "3") {
+        url = "https://handlowa.eu" + objOfUrlsForDownload["3"];
+      } else if (value.split("_")[1] == "2") {
+        url = "https://handlowa.eu" + objOfUrlsForDownload["2"];
+      } else if (value.split("_")[1] == "1") {
+        url = "https://handlowa.eu" + objOfUrlsForDownload["1"];
       }
+
+      console.log(url);
+
+      new Promise((resolve, reject) => {
+        downloadFile(url, value + ".xlsx");
+        console.log("url", url);
+        console.log("value", value);
+
+        resolve(value);
+      }).then((valueRes) => {
+        console.log(value + " before funk ");
+        botOnTelegtaf(value);
+      });
     });
+}
+
+function botOnTelegtaf(thisValue) {
+  console.log(thisValue, "thisValue");
+
+  bot.on("text", (ctx) => {
+    try {
+      console.log(GlobalValue, "test");
+      thisValue = GlobalValue;
+      let result;
+      const usersDate = ctx.message.text;
+
+      console.log("value in bot.on", thisValue);
+      const pathToFile = path.join(__dirname, `${thisValue}.xlsx`);
+
+      console.log(path.join(__dirname, `${thisValue}.xlsx`));
+
+      result = getnfo(pathToFile, checkAndFormatDate(usersDate), thisValue);
+
+      ctx.reply(result);
+    } catch (e) {
+      console.log(e);
+      ctx.reply("Sorry , incorrect date /help");
+    }
+    bot.end;
   });
 }
 
@@ -130,8 +191,39 @@ function downloadFile(url, nameOfFile) {
     response.pipe(file);
   });
 }
+ 
 
-function test(path, date = dateToday) {
+//  ++++++++++++++++++++++++++++++++
+function get(faculty) {
+  let URL;
+  faculty = faculty.split("_");
+  if(faculty[0] === "it"){
+    URL = "https://handlowa.eu/dla-studenta/organizacja-roku-akademickiego/informatyka/";
+
+  }else if (faculty[0] === "management") {
+    URL = "https://handlowa.eu/dla-studenta/organizacja-roku-akademickiego/zarzadzanie/";
+  }
+  else if (faculty[0] === "tourism") {
+    URL = "https://handlowa.eu/dla-studenta/organizacja-roku-akademickiego/turystyka-i-rekreacja/";
+  }
+  else if (faculty[0] === "finance") {
+    URL = "https://handlowa.eu/dla-studenta/organizacja-roku-akademickiego/finanse-i-rachunkowosc/";
+
+  }else if (faculty[0] === "logistic") {
+    URL = "https://handlowa.eu/dla-studenta/organizacja-roku-akademickiego/logistyka/";
+  }
+
+  return new Promise((resolve, reject) => {
+    needle.get(URL, function (err, res) {
+      if (err) reject(err);
+      resolve(res.body);
+    });
+  });
+}
+
+// ++++++++++++++++++++++++++++++++
+
+function getnfo(path, date = dateToday, infoAboutYear) {
   let row;
   let dateOfClass;
   let classInfo = "";
@@ -141,13 +233,17 @@ function test(path, date = dateToday) {
     classInfo +=
       'INCORRECT DATE, you have to write in format "day/month/year>", it\'s plan for Today\n\n';
     date = new Date();
-  } else {
+  } else if (date === "today"){
+    classInfo += 'It\'s plan for Today\n\n';
+    date = new Date();
+  }else {
     date = new Date(date);
   }
 
   //===================
 
-  classInfo += `Schedule for ${date.toDateString()} \n`;
+  classInfo += `Schedule for ${date.toDateString()} >> ${infoAboutYear.toUpperCase()}\n`;
+  
   const wb = xlsx.readFile(path, { cellDates: true });
   const id = wb.SheetNames[0];
   const ws = wb.Sheets[id];
@@ -197,9 +293,12 @@ function test(path, date = dateToday) {
 
 //====================================
 function checkAndFormatDate(userInput) {
+ if (userInput.toLowerCase() === "today") return "today" ;
   userInput = userInput.trim().split("/");
 
   let corectDate = [userInput[1], userInput[0], userInput[2]];
 
   return userInput.length === 3 ? corectDate.join("/") : "error";
 }
+}
+ 
